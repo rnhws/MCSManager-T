@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onBeforeUnmount, onMounted, watch } from "vue";
+import { ref, onBeforeUnmount, onMounted } from "vue";
 import { t } from "@/lang/i18n";
 import { EditorView } from "@codemirror/view";
 import { basicSetup } from "codemirror";
@@ -22,6 +22,7 @@ import { useAppConfigStore } from "@/stores/useAppConfigStore";
 import { linter } from "@codemirror/lint";
 import { jsonParseLinter } from "@codemirror/lang-json";
 import { lintGutter } from "@codemirror/lint";
+import { debounce } from "lodash-es";
 
 const { isDarkTheme } = useAppConfigStore();
 const emit = defineEmits(["update:text"]);
@@ -34,6 +35,12 @@ const props = defineProps<{
   height: string;
   filename: string;
 }>();
+
+const editorContainer = ref<HTMLElement>();
+let initialPinchDistance: number | null = null;
+let currentScale = 1;
+const MAX_SCALE = 3;
+const MIN_SCALE = 0.5;
 
 const baseFontSize = isPhone.value ? "14px" : "15px";
 const lineHeight = isPhone.value ? "22px" : "24px";
@@ -87,11 +94,8 @@ const getLanguageExtension = () => {
 };
 
 let editor: EditorView | null = null;
-let editableCompartment: Compartment;
-const Editable = ref(true);
 
 const initEditor = () => {
-  editableCompartment = new Compartment();
   const startState = EditorState.create({
     doc: props.text,
     extensions: [
@@ -107,7 +111,7 @@ const initEditor = () => {
         ".cm-content": {
           fontSize: baseFontSize,
           lineHeight: lineHeight,
-          "border-left": "2px solid #fbfbfb"
+          "border-left": "1px solid #fbfbfb"
         },
         ".cm-gutters": {
           backgroundColor: "#1a1a1c",
@@ -130,11 +134,10 @@ const initEditor = () => {
         }
       }),
       EditorView.updateListener.of((update) => {
-        if (!update.changes.empty && Editable.value) {
+        if (!update.changes.empty) {
           emit("update:text", update.state.doc.toString());
         }
-      }),
-      editableCompartment.of(EditorView.editable.of(Editable.value))
+      })
     ]
   });
 
@@ -149,27 +152,73 @@ const initEditor = () => {
   });
 };
 
-onMounted(initEditor);
-onBeforeUnmount(() => editor?.destroy());
-watch(Editable, (newVal) => {
-  if (editor) {
-    editor.dispatch({
-      effects: editableCompartment.reconfigure(EditorView.editable.of(newVal))
-    });
+const handleTouchStart = (e: TouchEvent) => {
+  if (e.touches.length === 2) {
+    initialPinchDistance = getDistance(e.touches[0], e.touches[1]);
   }
+};
+
+const handleTouchMove = debounce((e: TouchEvent) => {
+  if (e.touches.length === 2 && editorContainer.value) {
+    e.preventDefault();
+    const currentDistance = getDistance(e.touches[0], e.touches[1]);
+    
+    if (initialPinchDistance && currentDistance) {
+      const scale = currentDistance / initialPinchDistance;
+      const newScale = Math.min(Math.max(currentScale * scale, MIN_SCALE), MAX_SCALE);
+      
+      if (newScale !== currentScale) {
+        currentScale = newScale;
+        applyZoom(newScale);
+      }
+    }
+    initialPinchDistance = currentDistance;
+  }
+}, 10);
+
+const handleTouchEnd = () => {
+  initialPinchDistance = null;
+};
+
+const getDistance = (t1: Touch, t2: Touch) => {
+  return Math.hypot(
+    t2.clientX - t1.clientX,
+    t2.clientY - t1.clientY
+  );
+};
+
+const applyZoom = (scale: number) => {
+  if (!editorContainer.value) return;
+  
+  editorContainer.value.style.transform = `scale(${scale})`;
+  editorContainer.value.style.transformOrigin = '0 0';
+  editorContainer.value.style.width = `${100 / scale}%`;
+  editorContainer.value.style.height = `${100 / scale}%`;
+};
+
+onMounted(() => {
+  initEditor();
+  const container = editorContainer.value;
+  if (container) {
+    container.addEventListener('touchstart', handleTouchStart);
+    container.addEventListener('touchmove', handleTouchMove, { passive: false });
+    container.addEventListener('touchend', handleTouchEnd);
+  }
+});
+
+onBeforeUnmount(() => {
+  const container = editorContainer.value;
+  if (container) {
+    container.removeEventListener('touchstart', handleTouchStart);
+    container.removeEventListener('touchmove', handleTouchMove);
+    container.removeEventListener('touchend', handleTouchEnd);
+  }
+  editor?.destroy();
 });
 </script>
 
 <template>
-  <div class="editor-container">
-    <div class="mode-switcher">
-      <span class="mode-label">{{ Editable ? 't("读写")' : 't("只读")' }}</span>
-      <a-switch 
-        v-model:checked="Editable" 
-        class="mode-switch"
-        size="small"
-      />
-    </div>
+  <div class="editor-container" ref="editorContainer">
     <div :id="DOM_ID" class="file-editor"></div>
   </div>
 </template>
@@ -183,53 +232,11 @@ watch(Editable, (newVal) => {
   background: #1e1e1e;
   border-radius: 6px;
   overflow: hidden;
-  touch-action: pan-y;
-
+  touch-action: none;
+  transition: transform 0.1s ease-out;
+  
   @media (max-width: 768px) {
     height: 60vh;
-  }
-}
-
-.mode-switcher {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-  padding: 6px 12px;
-  background: rgba(37, 37, 38, 0.95);
-  border-radius: 4px;
-  backdrop-filter: blur(8px);
-  border: 1px solid #3c3c3c;
-  gap: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  
-  .mode-label {
-    font-size: 12px;
-    color: #d4d4d4;
-    line-height: 1;
-    font-weight: 500;
-  }
-  
-  .mode-switch {
-    :deep(.ant-switch) {
-      width: 40px;
-      min-width: 40px;
-      background: #3c3c3c;
-    }
-    :deep(.ant-switch-checked) {
-      width: 40px;
-      min-width: 40px;
-      background: #1890ff;
-    }
-    :deep(.ant-switch-handle) {
-      width: 16px;
-      height: 16px;
-      &::before {
-        border-radius: 8px;
-      }
-    }
   }
 }
 
@@ -237,7 +244,7 @@ watch(Editable, (newVal) => {
   flex: 1;
   overflow: hidden;
   -webkit-overflow-scrolling: touch;
-  overflow: auto;
+  transform: translateZ(0);
   
   @media (max-width: 768px) {
     .cm-content {
