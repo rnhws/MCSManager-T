@@ -160,8 +160,8 @@ onBeforeUnmount(() => {
 
 .editor-container {
   position: relative;
-  width: max-content;
-  min-width: 100%;
+  width: 100%;
+  min-width: fit-content;
   background: #1e1e1e;
   border-radius: 6px;
   transition: transform 0.1s ease-out;
@@ -170,14 +170,18 @@ onBeforeUnmount(() => {
 }
 
 .file-editor {
-  width: 100vw;
+  width: 100%;
   height: v-bind('props.height');
   overflow: visible;
   transform: translateZ(0);
-  box-sizing: border-box;
+  white-space: pre-wrap;
+
+  :deep(.cm-line) {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
 
   @media (max-width: 768px) {
-    width: 100%;
     height: 60vh;
     .cm-content {
       min-height: calc(100% + 100px);
