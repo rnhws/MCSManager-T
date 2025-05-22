@@ -40,13 +40,10 @@ let initialPinchDistance: number | null = null;
 let currentScale = 1;
 const MAX_SCALE = 3;
 const MIN_SCALE = 0.5;
-let startMidX = 0;
-let startMidY = 0;
-let startScrollLeft = 0;
-let startScrollTop = 0;
-
-const baseFontSize = isPhone.value ? "14px" : "15px";
-const lineHeight = isPhone.value ? "22px" : "24px";
+const baseFontSize = isPhone.value ? 14 : 15;
+const baseLineHeight = isPhone.value ? 22 : 24;
+const currentFontSize = ref(baseFontSize);
+const currentLineHeight = ref(baseLineHeight);
 
 const getLanguageExtension = () => {
   const ext = getFileExtName(props.filename);
@@ -66,6 +63,22 @@ const getLanguageExtension = () => {
 
 let editor: EditorView | null = null;
 
+const updateEditorStyle = () => {
+  if (!editor) return;
+  editor.dispatch({
+    effects: EditorView.theme({
+      "&": { 
+        fontSize: `${currentFontSize.value}px`,
+        lineHeight: `${currentLineHeight.value}px`
+      },
+      ".cm-content": {
+        fontSize: `${currentFontSize.value}px`,
+        lineHeight: `${currentLineHeight.value}px`
+      }
+    })
+  });
+};
+
 const initEditor = () => {
   const startState = EditorState.create({
     doc: props.text,
@@ -75,8 +88,15 @@ const initEditor = () => {
       getLanguageExtension(),
       EditorView.lineWrapping,
       EditorView.theme({
-        "&": { fontSize: baseFontSize, lineHeight: lineHeight },
-        ".cm-content": { fontSize: baseFontSize, lineHeight: lineHeight, "border-left": "1px solid #fbfbfb" },
+        "&": { 
+          fontSize: `${currentFontSize.value}px`,
+          lineHeight: `${currentLineHeight.value}px` 
+        },
+        ".cm-content": { 
+          fontSize: `${currentFontSize.value}px`,
+          lineHeight: `${currentLineHeight.value}px`,
+          "border-left": "1px solid #fbfbfb" 
+        },
         ".cm-gutters": { backgroundColor: "#1a1a1c", color: "#666672" },
         ".cm-gutterElement": { justifyContent: "flex-end" },
         ".cm-activeLineGutter": { backgroundColor: "#2a2a2e", color: "#fff" },
@@ -100,57 +120,41 @@ const initEditor = () => {
 
 const handleTouchStart = (e: TouchEvent) => {
   if (e.touches.length === 2) {
-    const t1 = e.touches[0];
-    const t2 = e.touches[1];
-    initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-    startMidX = (t1.clientX + t2.clientX) / 2;
-    startMidY = (t1.clientY + t2.clientY) / 2;
-    const container = editorContainer.value;
-    if (container) {
-      const wrapper = container.parentElement;
-      if (wrapper) {
-        startScrollLeft = wrapper.scrollLeft;
-        startScrollTop = wrapper.scrollTop;
-      }
-    }
+    initialPinchDistance = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
   }
 };
 
 const handleTouchMove = debounce((e: TouchEvent) => {
-  if (e.touches.length === 2 && editorContainer.value) {
+  if (e.touches.length === 2) {
     e.preventDefault();
-    const t1 = e.touches[0];
-    const t2 = e.touches[1];
-    const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-    if (initialPinchDistance !== null && currentDistance) {
-      const scaleFactor = currentDistance / initialPinchDistance;
-      const newScale = Math.min(Math.max(currentScale * scaleFactor, MIN_SCALE), MAX_SCALE);
-      const containerRect = editorContainer.value.getBoundingClientRect();
-      const offsetX = (t1.clientX + t2.clientX) / 2 - containerRect.left;
-      const offsetY = (t1.clientY + t2.clientY) / 2 - containerRect.top;
-      editorContainer.value.style.transformOrigin = `${offsetX}px ${offsetY}px`;
-      editorContainer.value.style.transform = `scale(${newScale})`;
-      const wrapper = editorContainer.value.parentElement;
-      if (wrapper) {
-        const oldScale = currentScale;
-        const scaleRatio = newScale / oldScale;
-        const wrapperRect = wrapper.getBoundingClientRect();
-        const clientX = (t1.clientX + t2.clientX) / 2;
-        const clientY = (t1.clientY + t2.clientY) / 2;
-        const contentX = startScrollLeft + clientX - wrapperRect.left;
-        const contentY = startScrollTop + clientY - wrapperRect.top;
-        const newContentX = contentX * scaleRatio;
-        const newContentY = contentY * scaleRatio;
-        wrapper.scrollLeft = newContentX - (clientX - wrapperRect.left);
-        wrapper.scrollTop = newContentY - (clientY - wrapperRect.top);
-      }
+    const currentDistance = Math.hypot(
+      e.touches[1].clientX - e.touches[0].clientX,
+      e.touches[1].clientY - e.touches[0].clientY
+    );
+    
+    if (initialPinchDistance && currentDistance) {
+      const scale = currentDistance / initialPinchDistance;
+      const newScale = Math.min(Math.max(currentScale * scale, MIN_SCALE), MAX_SCALE);
+      const scaleFactor = newScale / currentScale;
+      
+      currentFontSize.value = Math.round(baseFontSize * newScale);
+      currentLineHeight.value = Math.round(baseLineHeight * newScale);
       currentScale = newScale;
+      
+      updateEditorStyle();
     }
     initialPinchDistance = currentDistance;
   }
-}, 10);
+}, 100);
 
-const handleTouchEnd = () => initialPinchDistance = null;
+const handleTouchEnd = () => {
+  initialPinchDistance = null;
+  baseFontSize = currentFontSize.value;
+  baseLineHeight = currentLineHeight.value;
+};
 
 onMounted(() => {
   initEditor();
@@ -186,7 +190,7 @@ onBeforeUnmount(() => {
   height: v-bind('props.height');
   width: 100%;
   overflow: auto;
-  touch-action: none;
+  touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
   background: #1e1e1e;
   border-radius: 6px;
@@ -201,19 +205,16 @@ onBeforeUnmount(() => {
   position: relative;
   width: 100%;
   min-width: 100%;
-  transform-origin: 0 0;
-  transition: transform 0.1s ease-out;
 }
 
 .file-editor {
   width: 100%;
   height: v-bind('props.height');
-  transform: translateZ(0);
 
   :deep(.cm-editor) {
     width: 100%;
     height: 100%;
-    overflow: visible;
+    overflow: auto;
   }
 
   :deep(.cm-scroller) {
