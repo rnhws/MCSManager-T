@@ -36,6 +36,7 @@ const props = defineProps<{
 }>();
 
 const editorContainer = ref<HTMLElement>();
+const editorWrapper = ref<HTMLElement>();
 let initialPinchDistance: number | null = null;
 let currentScale = 1;
 const MAX_SCALE = 3;
@@ -73,7 +74,7 @@ const initEditor = () => {
       EditorView.theme({
         "&": { fontSize: baseFontSize, lineHeight: lineHeight },
         ".cm-content": { fontSize: baseFontSize, lineHeight: lineHeight, "border-left": "1px solid #fbfbfb" },
-        ".cm-gutters": { backgroundColor: "#1a1a1c", color: "#666672" },
+        ".cm-gutters": { backgroundColor": "#1a1a1c", color: "#666672" },
         ".cm-gutterElement": { justifyContent: "flex-end" },
         ".cm-activeLineGutter": { backgroundColor: "#2a2a2e", color: "#fff" },
         ".cm-lineNumbers .cm-gutterElement": { fontFamily: "Menlo, Monaco, Consolas, 'Courier New', monospace" },
@@ -99,7 +100,7 @@ const handleTouchStart = (e: TouchEvent) => {
 };
 
 const handleTouchMove = debounce((e: TouchEvent) => {
-  if (e.touches.length === 2 && editorContainer.value) {
+  if (e.touches.length === 2 && editorContainer.value && editorWrapper.value) {
     e.preventDefault();
     const currentDistance = getDistance(e.touches[0], e.touches[1]);
     if (initialPinchDistance && currentDistance) {
@@ -108,6 +109,9 @@ const handleTouchMove = debounce((e: TouchEvent) => {
       if (newScale !== currentScale) {
         currentScale = newScale;
         editorContainer.value.style.transform = `scale(${newScale})`;
+        const editorRect = editorContainer.value.getBoundingClientRect();
+        editorWrapper.value.style.width = `${editorRect.width}px`;
+        editorWrapper.value.style.height = `${editorRect.height}px`;
       }
     }
     initialPinchDistance = currentDistance;
@@ -119,7 +123,7 @@ const getDistance = (t1: Touch, t2: Touch) => Math.hypot(t2.clientX - t1.clientX
 
 onMounted(() => {
   initEditor();
-  const container = editorContainer.value;
+  const container = editorWrapper.value;
   if (container) {
     container.addEventListener('touchstart', handleTouchStart);
     container.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -128,7 +132,7 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-  const container = editorContainer.value;
+  const container = editorWrapper.value;
   if (container) {
     container.removeEventListener('touchstart', handleTouchStart);
     container.removeEventListener('touchmove', handleTouchMove);
@@ -139,7 +143,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="editor-wrapper">
+  <div class="editor-wrapper" ref="editorWrapper">
     <div class="editor-container" ref="editorContainer">
       <div :id="DOM_ID" class="file-editor"></div>
     </div>
@@ -155,6 +159,7 @@ onBeforeUnmount(() => {
   -webkit-overflow-scrolling: touch;
   background: #1e1e1e;
   border-radius: 6px;
+  position: relative;
 
   @media (max-width: 768px) {
     height: 60vh;
@@ -168,6 +173,7 @@ onBeforeUnmount(() => {
   min-width: 100%;
   transform-origin: 0 0;
   transition: transform 0.1s ease-out;
+  will-change: transform;
 }
 
 .file-editor {
