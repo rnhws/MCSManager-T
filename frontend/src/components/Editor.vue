@@ -149,63 +149,63 @@ onBeforeUnmount(() => {
 <style lang="scss" scoped>
 .editor-wrapper {
   height: v-bind('props.height');
+  width: 100%;
   overflow: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
-  width: 100%;
+  background: #1e1e1e;
+  border-radius: 6px;
 
   @media (max-width: 768px) {
     height: 60vh;
+    border-radius: 0;
   }
 }
 
 .editor-container {
   position: relative;
   width: 100%;
-  min-width: fit-content;
-  background: #1e1e1e;
-  border-radius: 6px;
-  transition: transform 0.1s ease-out;
+  min-width: 100%;
   transform-origin: 0 0;
-  transform-box: fill-box;
+  transition: transform 0.1s ease-out;
 }
 
 .file-editor {
   width: 100%;
   height: v-bind('props.height');
-  overflow: visible;
   transform: translateZ(0);
 
+  :deep(.cm-editor) {
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+  }
+
+  :deep(.cm-scroller) {
+    width: 100% !important;
+    min-width: 100%;
+    overflow: auto;
+  }
+
   :deep(.cm-content) {
+    width: 100% !important;
     max-width: 100%;
     white-space: pre-wrap;
+    box-sizing: border-box;
   }
 
   :deep(.cm-line) {
     word-break: break-word;
-    padding-right: 16px;
+    padding-right: 20px;
   }
 
   @media (max-width: 768px) {
     height: 60vh;
-    .cm-content {
-      min-height: calc(100% + 100px);
-      padding: 0 8px 0 8px !important;
+    :deep(.cm-content) {
+      padding: 0 12px !important;
     }
-  }
-}
-
-@media (max-width: 768px) {
-  .editor-container {
-    border-radius: 0;
-  }
-  
-  .file-editor {
-    font-size: 14px !important;
-    line-height: 22px !important;
-    
-    .cm-gutters {
-      font-size: 13px !important;
+    :deep(.cm-gutters) {
+      padding-left: 4px;
     }
   }
 }
