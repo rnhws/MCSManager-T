@@ -152,6 +152,7 @@ onBeforeUnmount(() => {
   overflow: auto;
   touch-action: pan-y;
   -webkit-overflow-scrolling: touch;
+  width: 100%;
 
   @media (max-width: 768px) {
     height: 60vh;
@@ -174,11 +175,15 @@ onBeforeUnmount(() => {
   height: v-bind('props.height');
   overflow: visible;
   transform: translateZ(0);
-  white-space: pre-wrap;
+
+  :deep(.cm-content) {
+    max-width: 100%;
+    white-space: pre-wrap;
+  }
 
   :deep(.cm-line) {
-    white-space: pre-wrap;
     word-break: break-word;
+    padding-right: 16px;
   }
 
   @media (max-width: 768px) {
