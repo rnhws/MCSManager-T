@@ -160,20 +160,24 @@ onBeforeUnmount(() => {
 
 .editor-container {
   position: relative;
-  width: fit-content;
+  width: max-content;
   min-width: 100%;
   background: #1e1e1e;
   border-radius: 6px;
   transition: transform 0.1s ease-out;
   transform-origin: 0 0;
+  transform-box: fill-box;
 }
 
 .file-editor {
+  width: 100vw;
   height: v-bind('props.height');
   overflow: visible;
   transform: translateZ(0);
+  box-sizing: border-box;
 
   @media (max-width: 768px) {
+    width: 100%;
     height: 60vh;
     .cm-content {
       min-height: calc(100% + 100px);
