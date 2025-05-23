@@ -106,7 +106,7 @@ const baseExtensions = [
 ];
 
 const updateEditor = () => {
-  if (!editor || editor.destroyed) return;
+  if (!editor || editor.isDestroyed) return;
   editor.dispatch({
     effects: StateEffect.reconfigure.of([
       ...baseExtensions,
@@ -206,7 +206,7 @@ onBeforeUnmount(() => {
   overflow: auto;
   background: #1e1e1e;
   border-radius: 6px;
-  touch-action: none;
+  touch-action: pan-y;
 
   @media (max-width: 768px) {
     height: 60vh;
