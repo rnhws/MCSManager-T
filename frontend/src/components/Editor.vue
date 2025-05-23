@@ -21,6 +21,7 @@ import { useAppConfigStore } from "@/stores/useAppConfigStore";
 import { linter } from "@codemirror/lint";
 import { jsonParseLinter } from "@codemirror/lang-json";
 import { lintGutter } from "@codemirror/lint";
+import { debounce } from "lodash-es";
 
 const { isDarkTheme } = useAppConfigStore();
 const emit = defineEmits(["update:text"]);
@@ -73,6 +74,27 @@ const getLanguageExtension = () => {
 
 let editor: EditorView | null = null;
 
+const createThemeExtension = () => {
+  return EditorView.theme({
+    "&": { 
+      fontSize: `${currentFontSize.value}px`,
+      lineHeight: `${currentLineHeight.value}px`,
+      "--cm-lint-marker-error-color": "#dc3545"
+    },
+    ".cm-content": {
+      fontSize: `${currentFontSize.value}px`,
+      lineHeight: `${currentLineHeight.value}px`,
+      "border-left": "1px solid #fbfbfb"
+    },
+    ".cm-gutters": {
+      backgroundColor: "#1a1a1c",
+      color: "#666672",
+      fontSize: `${currentFontSize.value}px`,
+      minWidth: `${currentFontSize.value * 3}px`
+    }
+  });
+};
+
 const baseExtensions = [
   basicSetup,
   tokyoNight,
@@ -88,25 +110,9 @@ const updateEditor = () => {
     effects: StateEffect.reconfigure.of([
       ...baseExtensions,
       ...getLanguageExtension(),
-      EditorView.theme({
-        "&": { 
-          fontSize: `${Math.max(8, currentFontSize.value)}px`,
-          lineHeight: `${currentLineHeight.value}px`,
-          letterSpacing: `${Math.max(0, 0.12 * currentFontSize.value)}px`
-        },
-        ".cm-content": {
-          fontSize: `${Math.max(8, currentFontSize.value)}px`,
-          lineHeight: `${currentLineHeight.value}px`,
-          minWidth: `${currentFontSize.value * 40}px`
-        },
-        ".cm-gutters": {
-          fontSize: `${Math.max(8, currentFontSize.value)}px`,
-          minWidth: `${currentFontSize.value * 4}px`
-        }
-      })
+      createThemeExtension()
     ])
   });
-  adjustContainerSize();
 };
 
 const initEditor = () => {
@@ -115,12 +121,7 @@ const initEditor = () => {
     extensions: [
       ...baseExtensions,
       ...getLanguageExtension(),
-      EditorView.theme({
-        "&": { 
-          fontSize: `${currentFontSize.value}px`,
-          lineHeight: `${currentLineHeight.value}px`
-        }
-      })
+      createThemeExtension()
     ]
   });
 
@@ -129,7 +130,7 @@ const initEditor = () => {
   editor = new EditorView({ state: startState, parent: parentElement });
 };
 
-const handleTouchMove = (e: TouchEvent) => {
+const handleTouchMove = debounce((e: TouchEvent) => {
   if (e.touches.length === 2 && editorContainer.value) {
     e.preventDefault();
     const t1 = e.touches[0];
@@ -139,17 +140,14 @@ const handleTouchMove = (e: TouchEvent) => {
     if (initialPinchDistance && currentDistance) {
       const scale = currentDistance / initialPinchDistance;
       const newScale = Math.min(Math.max(currentScale * scale, MIN_SCALE), MAX_SCALE);
-      
-      if (Math.abs(newScale - currentScale) > 0.1) {
-        currentFontSize.value = Math.max(8, Math.round(baseFontSize * newScale));
-        currentLineHeight.value = Math.round(baseLineHeight * newScale);
-        currentScale = newScale;
-        requestAnimationFrame(updateEditor);
-      }
+      currentFontSize.value = Math.round(baseFontSize * newScale);
+      currentLineHeight.value = Math.round(baseLineHeight * newScale);
+      currentScale = newScale;
+      updateEditor();
     }
     initialPinchDistance = currentDistance;
   }
-};
+}, 16);
 
 const handleTouchStart = (e: TouchEvent) => {
   if (e.touches.length === 2) {
@@ -165,14 +163,6 @@ const handleTouchEnd = () => {
   initialPinchDistance = null;
   baseFontSize = currentFontSize.value;
   baseLineHeight = currentLineHeight.value;
-};
-
-const adjustContainerSize = () => {
-  const container = editorContainer.value;
-  if (container) {
-    container.style.minWidth = `${currentFontSize.value * 60}px`;
-    container.style.minHeight = `${currentFontSize.value * 30}px`;
-  }
 };
 
 onMounted(() => {
@@ -213,7 +203,6 @@ onBeforeUnmount(() => {
   background: #1e1e1e;
   border-radius: 6px;
   touch-action: none;
-  overscroll-behavior: contain;
 
   @media (max-width: 768px) {
     height: 60vh;
@@ -225,45 +214,28 @@ onBeforeUnmount(() => {
   min-height: 100%;
   padding: 12px;
   transform-origin: 0 0;
-  transition: min-width 0.2s ease, min-height 0.2s ease;
-  min-width: v-bind('currentFontSize * 60 + "px"');
 }
 
 .file-editor {
   :deep(.cm-editor) {
     min-height: calc(v-bind('props.height') - 24px);
-    transition: font-size 0.15s cubic-bezier(0.4, 0, 0.2, 1), 
-                line-height 0.15s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  :deep(.cm-content) {
-    word-spacing: 0.05em;
-    white-space: pre-wrap !important;
-    overflow-wrap: anywhere;
-    padding-right: 1.2em;
-  }
-
-  :deep(.cm-line) {
-    min-height: calc(v-bind('currentLineHeight') * 1.2px);
-  }
-
-  :deep(.cm-gutters) {
-    min-width: v-bind('currentFontSize * 4 + "px"') !important;
+    transition: font-size 0.1s ease-out;
   }
 
   :deep(.cm-lint-marker-error) {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23dc3545'%3E%3Cpath d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z'/%3E%3C/svg%3E");
-    width: calc(1em * 1.3);
-    height: calc(1em * 1.3);
+    width: calc(1em * 1.2);
+    height: calc(1em * 1.2);
     background-size: contain;
-    margin-left: 0.3em;
+    margin-left: 0.2em;
+    transition: all 0.1s ease-out;
   }
 
   :deep(.cm-lintRange-error) {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 6 3'%3E%3Cg fill='%23dc3545'%3E%3Cpolygon points='5.5,0 2.5,3 1.1,3 4.1,0'/%3E%3Cpolygon points='4,0 6,2 6,0.6 5.4,0'/%3E%3Cpolygon points='0,2 1,3 2.4,3 0,0.6'/%3E%3C/g%3E%3C/svg%3E");
     background-position: bottom left;
     background-repeat: repeat-x;
-    background-size: auto calc(0.18em + 1px);
+    background-size: auto calc(0.15em + 1px);
   }
 }
 </style>
