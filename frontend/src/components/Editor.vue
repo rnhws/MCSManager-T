@@ -37,13 +37,14 @@ const props = defineProps<{
 
 const editorContainer = ref<HTMLElement>();
 let initialPinchDistance: number | null = null;
+let initialScale = 1;
+const MAX_SCALE = 1.5;
+const MIN_SCALE = 0.25;
+const initialFontSize = isPhone.value ? 14 : 15;
+const initialLineHeight = isPhone.value ? 22 : 24;
+const currentFontSize = ref(initialFontSize);
+const currentLineHeight = ref(initialLineHeight);
 let currentScale = 1;
-const MAX_SCALE = 3;
-const MIN_SCALE = 0.5;
-let baseFontSize = isPhone.value ? 14 : 15;
-let baseLineHeight = isPhone.value ? 22 : 24;
-const currentFontSize = ref(baseFontSize);
-const currentLineHeight = ref(baseLineHeight);
 
 const jsonLintExtensions = [
   lintGutter(),
@@ -139,9 +140,9 @@ const handleTouchMove = debounce((e: TouchEvent) => {
     
     if (initialPinchDistance && currentDistance) {
       const scale = currentDistance / initialPinchDistance;
-      const newScale = Math.min(Math.max(currentScale * scale, MIN_SCALE), MAX_SCALE);
-      currentFontSize.value = Math.round(baseFontSize * newScale);
-      currentLineHeight.value = Math.round(baseLineHeight * newScale);
+      const newScale = Math.min(Math.max(initialScale * scale, MIN_SCALE), MAX_SCALE);
+      currentFontSize.value = Math.round(initialFontSize * newScale);
+      currentLineHeight.value = Math.round(initialLineHeight * newScale);
       currentScale = newScale;
       updateEditor();
     }
@@ -154,15 +155,12 @@ const handleTouchStart = (e: TouchEvent) => {
     const t1 = e.touches[0];
     const t2 = e.touches[1];
     initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-    baseFontSize = currentFontSize.value;
-    baseLineHeight = currentLineHeight.value;
+    initialScale = currentScale;
   }
 };
 
 const handleTouchEnd = () => {
   initialPinchDistance = null;
-  baseFontSize = currentFontSize.value;
-  baseLineHeight = currentLineHeight.value;
 };
 
 onMounted(() => {
