@@ -37,7 +37,7 @@ const props = defineProps<{
 const editorContainer = ref<HTMLElement>();
 let startDistance = 0;
 let startScale = 1;
-const MAX_SCALE = 1.5;
+const MAX_SCALE = 3;
 const MIN_SCALE = 0.5;
 const baseFontSize = isPhone.value ? 14 : 15;
 const baseLineHeight = isPhone.value ? 22 : 24;
@@ -56,10 +56,7 @@ const getLanguageExtension = () => {
   const isJSON = ["json", "json5"].includes(ext);
   
   const languagesMap = [
-    { 
-      name: ["json", "json5"], 
-      plugin: () => [json(), ...(isJSON ? jsonLintExtensions : [])] 
-    },
+    { name: ["json", "json5"], plugin: () => [json(), ...(isJSON ? jsonLintExtensions : [])] },
     { name: ["js", "jsx", "ts", "tsx", "mjs", "djs"], plugin: () => [javascript({ jsx: true, typescript: ext === "ts" })] },
     { name: ["xml"], plugin: () => [xml()] },
     { name: ["css", "less", "scss"], plugin: () => [css()] },
@@ -106,7 +103,7 @@ const baseExtensions = [
 ];
 
 const updateEditor = () => {
-  if (!editor || editor.isDestroyed) return;
+  if (!editor) return;
   editor.dispatch({
     effects: StateEffect.reconfigure.of([
       ...baseExtensions,
@@ -187,7 +184,10 @@ onBeforeUnmount(() => {
     container.removeEventListener('touchend', handleTouchEnd);
     container.removeEventListener('touchcancel', handleTouchEnd);
   }
-  editor?.destroy();
+  if (editor) {
+    editor.destroy();
+    editor = null;
+  }
   cancelAnimationFrame(animationFrameId);
 });
 </script>
