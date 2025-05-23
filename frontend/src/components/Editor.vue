@@ -21,7 +21,6 @@ import { useAppConfigStore } from "@/stores/useAppConfigStore";
 import { linter } from "@codemirror/lint";
 import { jsonParseLinter } from "@codemirror/lang-json";
 import { lintGutter } from "@codemirror/lint";
-import { debounce } from "lodash-es";
 
 const { isDarkTheme } = useAppConfigStore();
 const emit = defineEmits(["update:text"]);
@@ -36,15 +35,16 @@ const props = defineProps<{
 }>();
 
 const editorContainer = ref<HTMLElement>();
-let initialPinchDistance: number | null = null;
-let initialScale = 1;
+let startDistance = 0;
+let startScale = 1;
 const MAX_SCALE = 1.5;
-const MIN_SCALE = 0.25;
-const initialFontSize = isPhone.value ? 14 : 15;
-const initialLineHeight = isPhone.value ? 22 : 24;
-const currentFontSize = ref(initialFontSize);
-const currentLineHeight = ref(initialLineHeight);
-let currentScale = 1;
+const MIN_SCALE = 0.5;
+const baseFontSize = isPhone.value ? 14 : 15;
+const baseLineHeight = isPhone.value ? 22 : 24;
+const currentFontSize = ref(baseFontSize);
+const currentLineHeight = ref(baseLineHeight);
+let scale = 1;
+let animationFrameId = 0;
 
 const jsonLintExtensions = [
   lintGutter(),
@@ -106,7 +106,7 @@ const baseExtensions = [
 ];
 
 const updateEditor = () => {
-  if (!editor) return;
+  if (!editor || editor.destroyed) return;
   editor.dispatch({
     effects: StateEffect.reconfigure.of([
       ...baseExtensions,
@@ -131,36 +131,41 @@ const initEditor = () => {
   editor = new EditorView({ state: startState, parent: parentElement });
 };
 
-const handleTouchMove = debounce((e: TouchEvent) => {
+const handleTouchMove = (e: TouchEvent) => {
   if (e.touches.length === 2 && editorContainer.value) {
     e.preventDefault();
-    const t1 = e.touches[0];
-    const t2 = e.touches[1];
-    const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-    
-    if (initialPinchDistance && currentDistance) {
-      const scale = currentDistance / initialPinchDistance;
-      const newScale = Math.min(Math.max(initialScale * scale, MIN_SCALE), MAX_SCALE);
-      currentFontSize.value = Math.round(initialFontSize * newScale);
-      currentLineHeight.value = Math.round(initialLineHeight * newScale);
-      currentScale = newScale;
-      updateEditor();
-    }
-    initialPinchDistance = currentDistance;
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = requestAnimationFrame(() => {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      
+      if (startDistance > 0) {
+        const scaleFactor = currentDistance / startDistance;
+        const newScale = startScale * scaleFactor;
+        scale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
+        
+        currentFontSize.value = Math.round(baseFontSize * scale);
+        currentLineHeight.value = Math.round(baseLineHeight * scale);
+        
+        updateEditor();
+      }
+    });
   }
-}, 16);
+};
 
 const handleTouchStart = (e: TouchEvent) => {
   if (e.touches.length === 2) {
     const t1 = e.touches[0];
     const t2 = e.touches[1];
-    initialPinchDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
-    initialScale = currentScale;
+    startDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+    startScale = scale;
   }
 };
 
 const handleTouchEnd = () => {
-  initialPinchDistance = null;
+  startDistance = 0;
+  cancelAnimationFrame(animationFrameId);
 };
 
 onMounted(() => {
@@ -183,6 +188,7 @@ onBeforeUnmount(() => {
     container.removeEventListener('touchcancel', handleTouchEnd);
   }
   editor?.destroy();
+  cancelAnimationFrame(animationFrameId);
 });
 </script>
 
