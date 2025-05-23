@@ -135,6 +135,7 @@ const handleTouchMove = (e: TouchEvent) => {
     e.preventDefault();
     cancelAnimationFrame(animationFrameId);
     animationFrameId = requestAnimationFrame(() => {
+      if (!editorContainer.value) return;
       const t1 = e.touches[0];
       const t2 = e.touches[1];
       const currentCenterX = (t1.clientX + t2.clientX) / 2;
