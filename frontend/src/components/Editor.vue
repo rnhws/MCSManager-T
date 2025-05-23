@@ -37,8 +37,10 @@ const props = defineProps<{
 const editorContainer = ref<HTMLElement>();
 let startDistance = 0;
 let startScale = 1;
-const MAX_SCALE = 3;
-const MIN_SCALE = 0.5;
+let startCenterX = 0;
+let startCenterY = 0;
+const MAX_SCALE = 1.25;
+const MIN_SCALE = 0.4;
 const baseFontSize = isPhone.value ? 14 : 15;
 const baseLineHeight = isPhone.value ? 22 : 24;
 const currentFontSize = ref(baseFontSize);
@@ -135,13 +137,21 @@ const handleTouchMove = (e: TouchEvent) => {
     animationFrameId = requestAnimationFrame(() => {
       const t1 = e.touches[0];
       const t2 = e.touches[1];
+      const currentCenterX = (t1.clientX + t2.clientX) / 2;
+      const currentCenterY = (t1.clientY + t2.clientY) / 2;
+      const containerRect = editorContainer.value.getBoundingClientRect();
+      const centerX = currentCenterX - containerRect.left;
+      const centerY = currentCenterY - containerRect.top;
+
       const currentDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
       
       if (startDistance > 0) {
         const scaleFactor = currentDistance / startDistance;
         const newScale = startScale * scaleFactor;
         scale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-        
+
+        editorContainer.value.style.transformOrigin = `${centerX}px ${centerY}px`;
+        editorContainer.value.style.transform = `scale(${scale})`;
         currentFontSize.value = Math.round(baseFontSize * scale);
         currentLineHeight.value = Math.round(baseLineHeight * scale);
         
@@ -152,11 +162,18 @@ const handleTouchMove = (e: TouchEvent) => {
 };
 
 const handleTouchStart = (e: TouchEvent) => {
-  if (e.touches.length === 2) {
+  if (e.touches.length === 2 && editorContainer.value) {
     const t1 = e.touches[0];
     const t2 = e.touches[1];
+    startCenterX = (t1.clientX + t2.clientX) / 2;
+    startCenterY = (t1.clientY + t2.clientY) / 2;
     startDistance = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
     startScale = scale;
+
+    const containerRect = editorContainer.value.getBoundingClientRect();
+    const initialCenterX = startCenterX - containerRect.left;
+    const initialCenterY = startCenterY - containerRect.top;
+    editorContainer.value.style.transformOrigin = `${initialCenterX}px ${initialCenterY}px`;
   }
 };
 
@@ -218,6 +235,8 @@ onBeforeUnmount(() => {
   min-height: 100%;
   padding: 12px;
   transform-origin: 0 0;
+  transition: transform 0.1s linear;
+  will-change: transform;
 }
 
 .file-editor {
